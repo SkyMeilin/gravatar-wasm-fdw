@@ -129,19 +129,14 @@ impl Guest for GravatarFdw {
                 }
                 
                 this.scanned_profiles.push(profile);
-            } else if resp.status_code == 404 {
-                // Profile not found, create a minimal profile with just email and hash
-                this.scanned_profiles.push(serde_json::json!({
-                    "email": email,
-                    "hash": Self::hash_email(&email)
-                }));
             } else {
-                // Other errors, still add minimal profile
-                utils::report_info(&format!("HTTP error {} for email {}", resp.status_code, email));
-                this.scanned_profiles.push(serde_json::json!({
-                    "email": email,
-                    "hash": Self::hash_email(&email)
-                }));
+                // Handle 404 (expected for private or non-existing profiles) and generic API errors
+                // by skipping this email - no row will be returned for failed lookups
+                if resp.status_code == 404 {
+                    utils::report_info(&format!("Profile not found for email: {}", email));
+                } else {
+                    utils::report_info(&format!("HTTP error {} for email {}: {}", resp.status_code, email, resp.body));
+                }
             }
         }
 

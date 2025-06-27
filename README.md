@@ -113,8 +113,8 @@ WHERE email = 'user@example.com';
 
 ## Error Handling
 
-- **Profile not found (404)**: Returns a minimal record with email and hash only
-- **API errors**: Returns a minimal record with email and hash, logs error
+- **Profile not found (404)**: Returns no rows (expected for private or non-existing profiles)
+- **API errors**: Returns no rows, logs error details
 - **No email filter**: Returns empty result set with informational message
 
 ## Development
