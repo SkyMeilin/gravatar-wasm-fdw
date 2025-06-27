@@ -7,8 +7,6 @@ A PostgreSQL Foreign Data Wrapper (FDW) for accessing Gravatar profile data, imp
 - Query Gravatar profiles by email address
 - Returns profile information including display name, avatar URL, location, etc.
 - Email hashing using SHA-256 (as required by Gravatar API)
-- Handles missing profiles gracefully
-- Implemented as a WASM component for enhanced security and portability
 
 ## Installation
 
@@ -19,27 +17,32 @@ cargo component build --target wasm32-unknown-unknown
 
 2. The resulting WASM file will be at: `target/wasm32-unknown-unknown/debug/gravatar_fdw.wasm`
 
-## Database Setup
+## FDW Setup
 
-Since this FDW implementation doesn't include automatic schema import, you need to manually create the foreign server and table:
-
-### 1. Create Foreign Server
+Since this FDW implementation doesn't include automatic schema import (yet), you need to manually create the foreign server and table:
 
 ```sql
-CREATE SERVER gravatar_server
-FOREIGN DATA WRAPPER wasm_fdw
-OPTIONS (
-  fdw_package_url 'file:///path/to/gravatar_fdw.wasm',
-  fdw_package_name 'automattic:gravatar-fdw',
-  fdw_package_version '0.1.0',
-  fdw_package_checksum 'sha256:your_checksum_here',
-  api_url 'https://api.gravatar.com/v3/profiles'  -- Optional: defaults to this URL
-);
-```
+-- Install Wrappers extension
 
-### 2. Create Foreign Table
+create extension if not exists wrappers with schema extensions;
 
-```sql
+create foreign data wrapper wasm_wrapper
+  handler wasm_fdw_handler
+  validator wasm_fdw_validator;
+
+-- Add Gravatar FDW server
+create server gravatar_server
+  foreign data wrapper wasm_wrapper
+  options (
+    fdw_package_url 'file:///gravatar_fdw.wasm', -- Use this to test from within the container
+    -- fdw_package_url 'https://github.com/Automattic/gravatar-wasm-fdw/releases/download/v0.1.0/gravatar_fdw.wasm',
+    fdw_package_name 'automattic:gravatar-fdw',
+    fdw_package_version '0.1.0'
+  );
+
+-- Create schema and tables
+create schema if not exists gravatar;
+
 CREATE FOREIGN TABLE gravatar_profiles (
   hash text,
   email text,
@@ -59,6 +62,7 @@ SERVER gravatar_server
 OPTIONS (
   table 'profiles'
 );
+
 ```
 
 ## Usage
@@ -127,6 +131,23 @@ WHERE email = 'user@example.com';
 └── Cargo.toml
 ```
 
+### Local Testing
+
+Requires `docker` and `supabase` cli. See official Wasm Wrapper instructions [here](https://fdw.dev/guides/wasm-advanced/#developing-locally). 
+
+Start the `supabase` environment with:
+```
+supabase init
+supabase start
+```
+
+Then run `./local-dev.sh` to build and copy the resulting `*.wasm` into the container. Repeat on every change (or do `cargo watch -s ./local-dev.sh`).
+
+Go into the SQL Editor from supabase at `http://127.0.0.1:54323/project/default/sql/1`.
+
+Copy, paste and run the SQL from the "FDW Setup" section above.
+
+
 ### Building
 
 ```bash
@@ -137,17 +158,11 @@ cargo component build --target wasm32-unknown-unknown
 cargo component build --target wasm32-unknown-unknown --release
 ```
 
-### Dependencies
-
-- `wit-bindgen-rt`: WIT runtime for Rust
-- `serde_json`: JSON parsing
-- `sha2`: SHA-256 hashing for email addresses
-
 ## Limitations
 
 - Requires email filters in WHERE clause (cannot scan without email)
 - Only supports equality filters on email field
-- Uses Supabase Wrappers v0.1.0 WIT interface (no automatic schema import)
+- No automatic schema import (yet)
 - Read-only (no INSERT/UPDATE/DELETE operations)
 
 ## License
