@@ -1,6 +1,6 @@
 package automattic:gravatar-fdw@0.1.0;
 
-world example {
+world gravatar {
     import supabase:wrappers/http@0.1.0;
     import supabase:wrappers/jwt@0.1.0;
     import supabase:wrappers/stats@0.1.0;

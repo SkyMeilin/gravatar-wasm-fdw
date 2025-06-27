@@ -1,27 +1,30 @@
 #[allow(warnings)]
 mod bindings;
 use serde_json::Value as JsonValue;
+use sha2::{Digest, Sha256};
 
 use bindings::{
     exports::supabase::wrappers::routines::Guest,
     supabase::wrappers::{
-        http, time,
-        types::{Cell, Context, FdwError, FdwResult, OptionsType, Row, TypeOid},
+        http,
+        types::{Cell, Context, FdwError, FdwResult, OptionsType, Row, TypeOid, Value},
         utils,
     },
 };
 
 #[derive(Debug, Default)]
-struct ExampleFdw {
+struct GravatarFdw {
     base_url: String,
-    src_rows: Vec<JsonValue>,
-    src_idx: usize,
+    scanned_profiles: Vec<JsonValue>,
+    scan_index: usize,
 }
 
 // pointer for the static FDW instance
-static mut INSTANCE: *mut ExampleFdw = std::ptr::null_mut::<ExampleFdw>();
+static mut INSTANCE: *mut GravatarFdw = std::ptr::null_mut::<GravatarFdw>();
 
-impl ExampleFdw {
+impl GravatarFdw {
+    const PROFILES_OBJECT: &'static str = "profiles";
+
     // initialise FDW instance
     fn init_instance() {
         let instance = Self::default();
@@ -33,9 +36,22 @@ impl ExampleFdw {
     fn this_mut() -> &'static mut Self {
         unsafe { &mut (*INSTANCE) }
     }
+
+    // Hash email using SHA-256
+    fn hash_email(email: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(email.trim().to_lowercase().as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
+
+    // Build URL for gravatar profile
+    fn build_url(&self, email: &str) -> String {
+        let hash = Self::hash_email(email);
+        format!("{}/{}", self.base_url, hash)
+    }
 }
 
-impl Guest for ExampleFdw {
+impl Guest for GravatarFdw {
     fn host_version_requirement() -> String {
         // semver expression for Wasm FDW host version requirement
         // ref: https://docs.rs/semver/latest/semver/enum.Op.html
@@ -47,7 +63,9 @@ impl Guest for ExampleFdw {
         let this = Self::this_mut();
 
         let opts = ctx.get_options(OptionsType::Server);
-        this.base_url = opts.require_or("api_url", "https://api.github.com");
+        this.base_url = opts.require_or("api_url", "https://api.gravatar.com/v3/profiles");
+
+        utils::report_info(&format!("Gravatar FDW initialized with base URL: {}", this.base_url));
 
         Ok(())
     }
@@ -55,28 +73,79 @@ impl Guest for ExampleFdw {
     fn begin_scan(ctx: &Context) -> FdwResult {
         let this = Self::this_mut();
 
+        // Clear previous results
+        this.scanned_profiles.clear();
+        this.scan_index = 0;
+
         let opts = ctx.get_options(OptionsType::Table);
-        let object = opts.require("object")?;
-        let url = format!("{}/{}", this.base_url, object);
+        let table = opts.require_or("table", Self::PROFILES_OBJECT);
 
-        let headers: Vec<(String, String)> =
-            vec![("user-agent".to_owned(), "Example FDW".to_owned())];
+        if table != Self::PROFILES_OBJECT {
+            return Err(format!("Unsupported table '{}'. Only 'profiles' is supported.", table));
+        }
 
-        let req = http::Request {
-            method: http::Method::Get,
-            url,
-            headers,
-            body: String::default(),
-        };
-        let resp = http::get(&req)?;
-        let resp_json: JsonValue = serde_json::from_str(&resp.body).map_err(|e| e.to_string())?;
+        // Look for email filters in quals
+        let mut emails_to_fetch = Vec::new();
+        for qual in ctx.get_quals() {
+            if qual.field() == "email" && qual.operator() == "=" {
+                if let Value::Cell(Cell::String(email)) = qual.value() {
+                    emails_to_fetch.push(email);
+                }
+            }
+        }
 
-        this.src_rows = resp_json
-            .as_array()
-            .map(|v| v.to_owned())
-            .expect("response should be a JSON array");
+        // If no email filter provided, we can't fetch profiles
+        if emails_to_fetch.is_empty() {
+            utils::report_info("No email filters provided. Gravatar FDW requires email = 'email@example.com' in WHERE clause");
+            return Ok(());
+        }
 
-        utils::report_info(&format!("We got response array length: {}", this.src_rows.len()));
+        // Fetch profiles for each email
+        let headers: Vec<(String, String)> = vec![
+            ("user-agent".to_owned(), "Gravatar WASM FDW".to_owned()),
+            ("accept".to_owned(), "application/json".to_owned()),
+        ];
+
+        for email in emails_to_fetch {
+            let url = this.build_url(&email);
+            
+            let req = http::Request {
+                method: http::Method::Get,
+                url,
+                headers: headers.clone(),
+                body: String::default(),
+            };
+            
+            let resp = http::get(&req)?;
+            
+            if resp.status_code == 200 {
+                // Parse successful response
+                let mut profile: JsonValue = serde_json::from_str(&resp.body)
+                    .map_err(|e| format!("Failed to parse JSON response: {}", e))?;
+                
+                // Add email to the response since API doesn't return it
+                if let JsonValue::Object(ref mut map) = profile {
+                    map.insert("email".to_string(), JsonValue::String(email.clone()));
+                }
+                
+                this.scanned_profiles.push(profile);
+            } else if resp.status_code == 404 {
+                // Profile not found, create a minimal profile with just email and hash
+                this.scanned_profiles.push(serde_json::json!({
+                    "email": email,
+                    "hash": Self::hash_email(&email)
+                }));
+            } else {
+                // Other errors, still add minimal profile
+                utils::report_info(&format!("HTTP error {} for email {}", resp.status_code, email));
+                this.scanned_profiles.push(serde_json::json!({
+                    "email": email,
+                    "hash": Self::hash_email(&email)
+                }));
+            }
+        }
+
+        utils::report_info(&format!("Found {} profiles", this.scanned_profiles.len()));
 
         Ok(())
     }
@@ -84,52 +153,59 @@ impl Guest for ExampleFdw {
     fn iter_scan(ctx: &Context, row: &Row) -> Result<Option<u32>, FdwError> {
         let this = Self::this_mut();
 
-        if this.src_idx >= this.src_rows.len() {
+        if this.scan_index >= this.scanned_profiles.len() {
             return Ok(None);
         }
 
-        let src_row = &this.src_rows[this.src_idx];
+        let profile = &this.scanned_profiles[this.scan_index];
+        
         for tgt_col in ctx.get_columns() {
             let tgt_col_name = tgt_col.name();
-            let src = src_row
-                .as_object()
-                .and_then(|v| v.get(&tgt_col_name))
-                .ok_or(format!("source column '{}' not found", tgt_col_name))?;
-            let cell = match tgt_col.type_oid() {
-                TypeOid::Bool => src.as_bool().map(Cell::Bool),
-                TypeOid::String => src.as_str().map(|v| Cell::String(v.to_owned())),
-                TypeOid::Timestamp => {
-                    if let Some(s) = src.as_str() {
-                        let ts = time::parse_from_rfc3339(s)?;
-                        Some(Cell::Timestamp(ts))
-                    } else {
-                        None
-                    }
-                }
-                TypeOid::Json => src.as_object().map(|_| Cell::Json(src.to_string())),
+            let cell = match tgt_col_name.as_str() {
+                "hash" => profile.get("hash").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "email" => profile.get("email").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "profile_url" => profile.get("profile_url").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "avatar_url" => profile.get("avatar_url").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "avatar_alt_text" => profile.get("avatar_alt_text").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "display_name" => profile.get("display_name").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "pronouns" => profile.get("pronouns").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "location" => profile.get("location").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "job_title" => profile.get("job_title").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "company" => profile.get("company").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "description" => profile.get("description").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "verified_accounts" => profile.get("verified_accounts").map(|v| Cell::Json(v.to_string())),
+                "attrs" => Some(Cell::Json(profile.to_string())),
                 _ => {
-                    return Err(format!(
-                        "column {} data type is not supported",
-                        tgt_col_name
-                    ));
+                    // For unknown columns, try to get the value directly
+                    match tgt_col.type_oid() {
+                        TypeOid::Bool => profile.get(&tgt_col_name).and_then(|v| v.as_bool()).map(Cell::Bool),
+                        TypeOid::String => profile.get(&tgt_col_name).and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                        TypeOid::I32 => profile.get(&tgt_col_name).and_then(|v| v.as_i64()).map(|i| Cell::I32(i as i32)),
+                        TypeOid::I64 => profile.get(&tgt_col_name).and_then(|v| v.as_i64()).map(Cell::I64),
+                        TypeOid::Json => profile.get(&tgt_col_name).map(|v| Cell::Json(v.to_string())),
+                        _ => None,
+                    }
                 }
             };
 
             row.push(cell.as_ref());
         }
 
-        this.src_idx += 1;
+        this.scan_index += 1;
 
         Ok(Some(0))
     }
 
     fn re_scan(_ctx: &Context) -> FdwResult {
-        Err("re_scan on foreign table is not supported".to_owned())
+        let this = Self::this_mut();
+        this.scan_index = 0;
+        Ok(())
     }
 
     fn end_scan(_ctx: &Context) -> FdwResult {
         let this = Self::this_mut();
-        this.src_rows.clear();
+        this.scanned_profiles.clear();
+        this.scan_index = 0;
         Ok(())
     }
 
@@ -152,6 +228,7 @@ impl Guest for ExampleFdw {
     fn end_modify(_ctx: &Context) -> FdwResult {
         Ok(())
     }
+
 }
 
-bindings::export!(ExampleFdw with_types_in bindings);
+bindings::export!(GravatarFdw with_types_in bindings);

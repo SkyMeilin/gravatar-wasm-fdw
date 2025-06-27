@@ -13,3 +13,9 @@ target/
 cmake*/
 .direnv
 src/bindings.rs
+
+# Claude Code
+.claude/
+
+# Supabse CLI (local testing)
+supabase/
