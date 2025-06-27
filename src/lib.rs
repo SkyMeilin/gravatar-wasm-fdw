@@ -101,8 +101,10 @@ impl Guest for GravatarFdw {
         }
 
         // Fetch profiles for each email
+        let user_agent = format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+        utils::report_info(&format!("Using User-Agent: {}", user_agent));
         let headers: Vec<(String, String)> = vec![
-            ("user-agent".to_owned(), "Gravatar WASM FDW".to_owned()),
+            ("user-agent".to_owned(), user_agent),
             ("accept".to_owned(), "application/json".to_owned()),
         ];
 

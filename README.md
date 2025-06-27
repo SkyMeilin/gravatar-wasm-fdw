@@ -147,6 +147,17 @@ Go into the SQL Editor from supabase at `http://127.0.0.1:54323/project/default/
 
 Copy, paste and run the SQL from the "FDW Setup" section above.
 
+To check the logs you can tweak the log levels with:
+```sql
+-- Set to show INFO messages in the logs
+set log_min_messages to 'info';
+
+-- Now try your query
+select * from gravatar_profiles where email = 'test@example.com';
+```
+
+And then check the logs using docker `docker logs` on the database container, or checking on the SQL Editor the Logs tab for Postgres at `http://127.0.0.1:54323/project/default/logs/postgres-logs`.
+
 
 ### Building
 
