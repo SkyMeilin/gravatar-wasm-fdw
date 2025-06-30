@@ -45,18 +45,29 @@ create schema if not exists gravatar;
 
 CREATE FOREIGN TABLE gravatar_profiles (
   hash text,
-  email text,
+  display_name text,
   profile_url text,
   avatar_url text,
   avatar_alt_text text,
-  display_name text,
-  pronouns text,
   location text,
+  description text,
   job_title text,
   company text,
-  description text,
   verified_accounts jsonb,
-  attrs jsonb  -- Complete profile data as JSON
+  pronunciation text,
+  pronouns text,
+  timezone text,
+  first_name text,
+  last_name text,
+  is_organization bool,
+  links jsonb,
+  interests jsonb,
+  payments jsonb,
+  contact_info jsonb,
+  number_verified_accounts int,
+  last_profile_edit timestamp,
+  registration_date timestamp,
+  json jsonb  -- Complete profile data as JSON
 )
 SERVER gravatar_server
 OPTIONS (

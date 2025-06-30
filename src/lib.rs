@@ -129,11 +129,6 @@ impl Guest for GravatarFdw {
                 let mut profile: JsonValue = serde_json::from_str(&resp.body)
                     .map_err(|e| format!("Failed to parse JSON response: {}", e))?;
                 
-                // Add email to the response since API doesn't return it
-                if let JsonValue::Object(ref mut map) = profile {
-                    map.insert("email".to_string(), JsonValue::String(email.clone()));
-                }
-                
                 this.scanned_profiles.push(profile);
             } else {
                 // Handle 404 (expected for private or non-existing profiles) and generic API errors
@@ -164,18 +159,30 @@ impl Guest for GravatarFdw {
             let tgt_col_name = tgt_col.name();
             let cell = match tgt_col_name.as_str() {
                 "hash" => profile.get("hash").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
-                "email" => profile.get("email").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "display_name" => profile.get("display_name").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
                 "profile_url" => profile.get("profile_url").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
                 "avatar_url" => profile.get("avatar_url").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
                 "avatar_alt_text" => profile.get("avatar_alt_text").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
-                "display_name" => profile.get("display_name").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
-                "pronouns" => profile.get("pronouns").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
                 "location" => profile.get("location").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "description" => profile.get("description").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
                 "job_title" => profile.get("job_title").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
                 "company" => profile.get("company").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
-                "description" => profile.get("description").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
                 "verified_accounts" => profile.get("verified_accounts").map(|v| Cell::Json(v.to_string())),
-                "attrs" => Some(Cell::Json(profile.to_string())),
+                "pronunciation" => profile.get("pronunciation").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "pronouns" => profile.get("pronouns").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "timezone" => profile.get("timezone").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "languages" => profile.get("languages").map(|v| Cell::Json(v.to_string())),
+                "first_name" => profile.get("first_name").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "last_name" => profile.get("last_name").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "is_organization" => profile.get("is_organization").and_then(|v| v.as_bool()).map(|s| Cell::Bool(s)),
+                "links" => profile.get("links").map(|v| Cell::Json(v.to_string())),
+                "interests" => profile.get("interests").map(|v| Cell::Json(v.to_string())),
+                "payments" => profile.get("payments").map(|v| Cell::Json(v.to_string())),
+                "contact_info" => profile.get("contact_info").map(|v| Cell::Json(v.to_string())),
+                "number_verified_accounts" => profile.get("number_verified_accounts").and_then(|v| v.as_i64()).map(|s| Cell::I64(s)),
+                "last_profile_edit" => profile.get("last_profile_edit").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())), // Postgres is converting string to timestamp.
+                "registration_date" => profile.get("registration_date").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())), // Postgres is converting string to timestmap.
+                "json" => Some(Cell::Json(profile.to_string())),
                 _ => {
                     // For unknown columns, try to get the value directly
                     match tgt_col.type_oid() {
