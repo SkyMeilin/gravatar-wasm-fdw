@@ -1,3 +1,7 @@
+// Copyright 2025 Automattic
+//
+// This file is part of Gravatar Wasm Foreign Data Wrapper which is licensed under
+// the GNU General Public License v3.0.
 #[allow(warnings)]
 mod bindings;
 use serde_json::Value as JsonValue;

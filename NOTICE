@@ -1,0 +1,13 @@
+This project contains code from multiple sources under different licenses:
+
+1. Original Supabase Wrappers Template Code:
+   - Copyright Supabase Community
+   - Licensed under Apache License 2.0 (see LICENSE-APACHE)
+   - Original source: https://github.com/supabase-community/postgres-wasm-fdw
+
+2. Custom Foreign Data Wrapper Implementation:
+   - Copyright Automattic
+   - Licensed under GNU General Public License v3.0 or later (see LICENSE-GPL)
+
+The combined work is distributed under GPL v3.0 or later, which is
+compatible with the Apache 2.0 license of the original template.

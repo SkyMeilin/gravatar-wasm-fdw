@@ -178,4 +178,8 @@ cargo component build --target wasm32-unknown-unknown --release
 
 ## License
 
-[Apache License Version 2.0](./LICENSE)
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
+
+This project is based on the [postgres-wasm-fdw](https://github.com/supabase-community/postgres-wasm-fdw) template, which is licensed under Apache 2.0. The original template code remains under Apache 2.0 license - see the [LICENSE-APACHE](LICENSE-APACHE) file for details.
+
+The combined work is distributed under GPL v3.0, which is compatible with Apache 2.0.
