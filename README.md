@@ -32,10 +32,10 @@ create foreign data wrapper wasm_wrapper
   handler wasm_fdw_handler
   validator wasm_fdw_validator;
 
--- Add Gravatar FDW server (with API key from Vault - recommended)
--- First, store your API key in Vault
+-- Recommended: Add Gravatar FDW server (with API key from Vault)
+--   First, store your API key in Vault
 select vault.create_secret('your-gravatar-api-key-value', 'gravatar-api-key');
--- Then use the new vault secret's ID
+--   Then use the new vault secret's ID
 create server gravatar_server
   foreign data wrapper wasm_wrapper
   options (
@@ -46,8 +46,7 @@ create server gravatar_server
     api_key_id 'your-vault-secret-uuid-here'
   );
 
-
--- Alternative: Direct API key (not recommended for production)
+-- Alternative 1: Direct API key (not recommended for production)
 -- create server gravatar_server
 --   foreign data wrapper wasm_wrapper
 --   options (
@@ -55,6 +54,15 @@ create server gravatar_server
 --     fdw_package_name 'automattic:gravatar-fdw',
 --     fdw_package_version '0.1.0',
 --     api_key 'your-direct-api-key-here'
+--   );
+
+-- Alternative 2: No API key (only for development, rate limited)
+-- create server gravatar_server
+--   foreign data wrapper wasm_wrapper
+--   options (
+--     fdw_package_url 'file:///gravatar_fdw.wasm',
+--     fdw_package_name 'automattic:gravatar-fdw',
+--     fdw_package_version '0.1.0',
 --   );
 
 -- Optional: Delete existing schema
