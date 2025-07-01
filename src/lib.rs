@@ -128,7 +128,12 @@ impl Guest for GravatarFdw {
                 // Parse successful response
                 let mut profile: JsonValue = serde_json::from_str(&resp.body)
                     .map_err(|e| format!("Failed to parse JSON response: {}", e))?;
-                
+
+                // Add email to the response since API doesn't return it
+                if let JsonValue::Object(ref mut map) = profile {
+                    map.insert("email".to_string(), JsonValue::String(email.clone()));
+                }
+
                 this.scanned_profiles.push(profile);
             } else {
                 // Handle 404 (expected for private or non-existing profiles) and generic API errors
@@ -159,6 +164,7 @@ impl Guest for GravatarFdw {
             let tgt_col_name = tgt_col.name();
             let cell = match tgt_col_name.as_str() {
                 "hash" => profile.get("hash").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
+                "email" => profile.get("email").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
                 "display_name" => profile.get("display_name").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
                 "profile_url" => profile.get("profile_url").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),
                 "avatar_url" => profile.get("avatar_url").and_then(|v| v.as_str()).map(|s| Cell::String(s.to_string())),

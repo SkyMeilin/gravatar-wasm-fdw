@@ -43,8 +43,9 @@ create server gravatar_server
 -- Create schema and tables
 create schema if not exists gravatar;
 
-CREATE FOREIGN TABLE gravatar_profiles (
+CREATE FOREIGN TABLE gravatar.profiles (
   hash text,
+  email text,
   display_name text,
   profile_url text,
   avatar_url text,
@@ -84,7 +85,7 @@ The FDW requires an email filter in your queries. You cannot scan all profiles w
 
 ```sql
 SELECT display_name, avatar_url, location 
-FROM gravatar_profiles 
+FROM gravatar.profiles
 WHERE email = 'user@example.com';
 ```
 
@@ -92,7 +93,7 @@ WHERE email = 'user@example.com';
 
 ```sql
 SELECT email, display_name, company
-FROM gravatar_profiles 
+FROM gravatar.profiles
 WHERE email IN ('user1@example.com', 'user2@example.com');
 ```
 
@@ -164,7 +165,7 @@ To check the logs you can tweak the log levels with:
 set log_min_messages to 'info';
 
 -- Now try your query
-select * from gravatar_profiles where email = 'test@example.com';
+select * from gravatar.profiles where email = 'test@example.com';
 ```
 
 And then check the logs using docker `docker logs` on the database container, or checking on the SQL Editor the Logs tab for Postgres at `http://127.0.0.1:54323/project/default/logs/postgres-logs`.
