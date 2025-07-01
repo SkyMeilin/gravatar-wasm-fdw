@@ -80,39 +80,17 @@ jobs:
           CHECKSUM: ${{ steps.extract.outputs.CHECKSUM }}
         run: |
           cat > README.txt <<EOF
-          To use this Wasm foreign data wrapper on Supabase, create a foreign table like below,
+          To use this Wasm foreign data wrapper on Supabase follow the steps in https://github.com/${GITHUB_REPOSITORY}.
 
-          create extension if not exists wrappers with schema extensions;
+          The specific options for this version of the gravatar_server are:
 
-          create foreign data wrapper wasm_wrapper
-            handler wasm_fdw_handler
-            validator wasm_fdw_validator;
-
-          create server example_server
+          create server gravatar_server
             foreign data wrapper wasm_wrapper
             options (
               fdw_package_url 'https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/${PROJECT}.wasm',
               fdw_package_name '${PACKAGE}',
               fdw_package_version '${VERSION}',
-              fdw_package_checksum '${CHECKSUM}',
-              api_url 'https://api.github.com'
-            );
-
-          create schema github;
-
-          create foreign table github.events (
-            id text,
-            type text,
-            actor jsonb,
-            repo jsonb,
-            payload jsonb,
-            public boolean,
-            created_at timestamp
-          )
-            server example_server
-            options (
-              object 'events',
-              rowid_column 'id'
+              fdw_package_checksum '${CHECKSUM}'
             );
 
           For more details, please visit https://fdw.dev.
