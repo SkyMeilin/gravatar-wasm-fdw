@@ -28,8 +28,11 @@ jobs:
           # add wasm32-unknown-unknown target
           rustup target add wasm32-unknown-unknown
 
-          # install Wasm component
-          cargo install cargo-component --version 0.21.1
+          # install cargo binstall
+          curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+
+          # install Wasm component using binstall (speedup)
+          cargo binstall cargo-component --version 0.21.1
 
           # install rustfmt for the toolchain
           rustup component add rustfmt
