@@ -7,6 +7,8 @@ A PostgreSQL Foreign Data Wrapper (FDW) for accessing Gravatar profile data, imp
 - Query Gravatar profiles by email address
 - Returns profile information including display name, avatar URL, location, etc.
 - Email hashing using SHA-256 (as required by Gravatar API)
+- Support for API key authentication via Supabase Vault extension
+- Automatic fallback to public API when no API key is provided
 
 ## Installation
 
@@ -30,15 +32,33 @@ create foreign data wrapper wasm_wrapper
   handler wasm_fdw_handler
   validator wasm_fdw_validator;
 
--- Add Gravatar FDW server
+-- Add Gravatar FDW server (with API key from Vault - recommended)
+-- First, store your API key in Vault
+select vault.create_secret('your-gravatar-api-key-value', 'gravatar-api-key');
+-- Then use the new vault secret's ID
 create server gravatar_server
   foreign data wrapper wasm_wrapper
   options (
     fdw_package_url 'file:///gravatar_fdw.wasm', -- Use this to test from within the container
     -- fdw_package_url 'https://github.com/Automattic/gravatar-wasm-fdw/releases/download/v0.1.0/gravatar_fdw.wasm',
     fdw_package_name 'automattic:gravatar-fdw',
-    fdw_package_version '0.1.0'
+    fdw_package_version '0.1.0',
+    api_key_id 'your-vault-secret-uuid-here'
   );
+
+
+-- Alternative: Direct API key (not recommended for production)
+-- create server gravatar_server
+--   foreign data wrapper wasm_wrapper
+--   options (
+--     fdw_package_url 'file:///gravatar_fdw.wasm',
+--     fdw_package_name 'automattic:gravatar-fdw',
+--     fdw_package_version '0.1.0',
+--     api_key 'your-direct-api-key-here'
+--   );
+
+-- Optional: Delete existing schema
+-- drop schema gravatar cascade;
 
 -- Create schema and tables
 create schema if not exists gravatar;

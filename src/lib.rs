@@ -19,6 +19,7 @@ use bindings::{
 #[derive(Debug, Default)]
 struct GravatarFdw {
     base_url: String,
+    headers: Vec<(String, String)>,
     scanned_profiles: Vec<JsonValue>,
     scan_index: usize,
 }
@@ -69,6 +70,31 @@ impl Guest for GravatarFdw {
         let opts = ctx.get_options(OptionsType::Server);
         this.base_url = opts.require_or("api_url", "https://api.gravatar.com/v3/profiles");
 
+        // Initialize basic headers
+        let user_agent = format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+        this.headers.push(("user-agent".to_owned(), user_agent));
+        this.headers.push(("accept".to_owned(), "application/json".to_owned()));
+
+        // Handle API key authentication
+        // Support two options: direct api_key or api_key_id (vault UUID)
+        if let Some(api_key) = opts.get("api_key") {
+            // Direct API key provided (not recommended for production)
+            this.headers.push(("authorization".to_owned(), format!("Bearer {}", api_key)));
+            utils::report_info("Gravatar FDW initialized with direct API key");
+        } else if let Some(api_key_id) = opts.get("api_key_id") {
+            // Get API key from Vault using UUID
+            let vault_api_key = utils::get_vault_secret(&api_key_id).unwrap_or_default();
+            if !vault_api_key.is_empty() {
+                this.headers.push(("authorization".to_owned(), format!("Bearer {}", vault_api_key)));
+                utils::report_info("Gravatar FDW initialized with API key from Vault");
+            } else {
+                return Err(format!("Failed to retrieve API key from Vault using ID: {}", api_key_id));
+            }
+        } else {
+            // No API key provided - will use public API endpoints only
+            utils::report_info("Gravatar FDW initialized without API key (public access only)");
+        }
+
         utils::report_info(&format!("Gravatar FDW initialized with base URL: {}", this.base_url));
 
         Ok(())
@@ -105,20 +131,13 @@ impl Guest for GravatarFdw {
         }
 
         // Fetch profiles for each email
-        let user_agent = format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
-        utils::report_info(&format!("Using User-Agent: {}", user_agent));
-        let headers: Vec<(String, String)> = vec![
-            ("user-agent".to_owned(), user_agent),
-            ("accept".to_owned(), "application/json".to_owned()),
-        ];
-
         for email in emails_to_fetch {
             let url = this.build_url(&email);
             
             let req = http::Request {
                 method: http::Method::Get,
                 url,
-                headers: headers.clone(),
+                headers: this.headers.clone(),
                 body: String::default(),
             };
             
