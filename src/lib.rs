@@ -11,6 +11,7 @@ use bindings::{
     exports::supabase::wrappers::routines::Guest,
     supabase::wrappers::{
         http,
+        time,
         types::{Cell, Context, FdwError, FdwResult, OptionsType, Row, TypeOid, Value},
         utils,
     },
@@ -133,16 +134,45 @@ impl Guest for GravatarFdw {
         // Fetch profiles for each email
         for email in emails_to_fetch {
             let url = this.build_url(&email);
-            
+
             let req = http::Request {
                 method: http::Method::Get,
                 url,
                 headers: this.headers.clone(),
                 body: String::default(),
             };
-            
+
             let resp = http::get(&req)?;
-            
+
+            // Handle 429 rate limiting
+            if resp.status_code == 429 {
+                // Check if we're using an API key
+                let using_api_key = this.headers.iter().any(|(key, _)| key.to_lowercase() == "authorization");
+
+                // Build error message based on X-RateLimit-Reset header and API key usage
+                let mut error_msg = "Rate limit exceeded (429).".to_string();
+
+                if let Some(reset_header) = resp.headers.iter().find(|h| h.0.to_lowercase() == "x-ratelimit-reset") {
+                    if let Ok(reset_timestamp) = reset_header.1.parse::<u64>() {
+                        let current_time = time::epoch_secs() as u64;
+                        let wait_seconds = if reset_timestamp > current_time {
+                            reset_timestamp - current_time
+                        } else {
+                            0
+                        };
+                        error_msg.push_str(&format!(" Wait {} seconds for reset.", wait_seconds));
+                    }
+                }
+
+                if using_api_key {
+                    error_msg.push_str(" Please contact Gravatar to increase your usage limit.");
+                } else {
+                    error_msg.push_str(" Consider getting an API key at https://gravatar.com/developers/applications for higher rate limits.");
+                }
+
+                return Err(error_msg);
+            }
+
             if resp.status_code == 200 {
                 // Parse successful response
                 let mut profile: JsonValue = serde_json::from_str(&resp.body)
@@ -178,7 +208,7 @@ impl Guest for GravatarFdw {
         }
 
         let profile = &this.scanned_profiles[this.scan_index];
-        
+
         for tgt_col in ctx.get_columns() {
             let tgt_col_name = tgt_col.name();
             let cell = match tgt_col_name.as_str() {

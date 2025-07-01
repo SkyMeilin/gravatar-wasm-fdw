@@ -62,7 +62,7 @@ create server gravatar_server
 --   options (
 --     fdw_package_url 'file:///gravatar_fdw.wasm',
 --     fdw_package_name 'automattic:gravatar-fdw',
---     fdw_package_version '0.1.0',
+--     fdw_package_version '0.1.0'
 --   );
 
 -- Optional: Delete existing schema
@@ -169,6 +169,7 @@ WHERE email = 'user@example.com';
 - **Profile not found (404)**: Returns no rows (expected for private or non-existing profiles)
 - **API errors**: Returns no rows, logs error details
 - **No email filter**: Returns empty result set with informational message
+- **Rate Limit**: Returns error with details on the time to wait and how to get higher rate limits
 
 ## Development
 
@@ -228,6 +229,9 @@ cargo component build --target wasm32-unknown-unknown --release
 - Only supports equality filters on email field
 - No automatic schema import (yet)
 - Read-only (no INSERT/UPDATE/DELETE operations)
+- Any request failure implies three retries with exponential backoff.
+    - This is Wrapper's default behaviour and can't be disabled.
+    - Specially annoying for Rate Limit errors (HTTP 429).
 
 ## License
 
