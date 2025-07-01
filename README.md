@@ -129,27 +129,40 @@ WHERE email IN ('user1@example.com', 'user2@example.com');
 
 ```sql
 SELECT email, attrs
-FROM gravatar_profiles 
+FROM gravatar.profiles
 WHERE email = 'user@example.com';
 ```
 
 ## Column Descriptions
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `hash` | text | SHA-256 hash of the email (used by Gravatar API) |
-| `email` | text | Email address (added by FDW, not returned by API) |
-| `profile_url` | text | URL to the Gravatar profile page |
-| `avatar_url` | text | URL to the avatar image |
-| `avatar_alt_text` | text | Alt text for the avatar image |
-| `display_name` | text | Display name |
-| `pronouns` | text | User's pronouns |
-| `location` | text | Location |
-| `job_title` | text | Job title |
-| `company` | text | Company |
-| `description` | text | Profile description/bio |
-| `verified_accounts` | jsonb | Verified social media accounts |
-| `attrs` | jsonb | Complete profile data as returned by API |
+| Column                     | Type      | Description |
+|----------------------------|-----------|-------------|
+| `hash`                     | text      | SHA-256 hash of the email (used by Gravatar API) |
+| `email`                    | text      | Email address (added by FDW, not returned by API) |
+| `display_name`             | text      | Display name |
+| `profile_url`              | text      | URL to the Gravatar profile page |
+| `avatar_url`               | text      | URL to the avatar image |
+| `avatar_alt_text`          | text      | Alt text for the avatar image |
+| `location`                 | text      | Location |
+| `description`              | text      | Profile description/bio |
+| `job_title`                | text      | Job title |
+| `company`                  | text      | Company |
+| `verified_accounts`        | jsonb     | Verified social media accounts |
+| `pronunciation`            | text      | Pronunciation guide for the user's name |
+| `pronouns`                 | text      | User's pronouns |
+| `timezone`                 | text      | User's timezone |
+| `languages`                | jsonb     | Languages spoken by the user |
+| `first_name`               | text      | First name |
+| `last_name`                | text      | Last name |
+| `is_organization`          | bool      | Whether this is an organization profile |
+| `links`                    | jsonb     | Social media and website links |
+| `interests`                | jsonb     | User's interests and hobbies |
+| `payments`                 | jsonb     | Payment methods and donation links |
+| `contact_info`             | jsonb     | Contact information |
+| `number_verified_accounts` | int       | Number of verified social media accounts |
+| `last_profile_edit`        | timestamp | Date and time of last profile edit |
+| `registration_date`        | timestamp | Account registration date |
+| `json`                     | jsonb     | Complete profile data as returned by API |
 
 ## Error Handling
 
