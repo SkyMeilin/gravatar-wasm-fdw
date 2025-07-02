@@ -90,7 +90,8 @@ jobs:
               fdw_package_url 'https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/${PROJECT}.wasm',
               fdw_package_name '${PACKAGE}',
               fdw_package_version '${VERSION}',
-              fdw_package_checksum '${CHECKSUM}'
+              fdw_package_checksum '${CHECKSUM}',
+              api_key 'your-secret-api-key-here' -- For production use 'api_key_id' instead with Vault.
             );
 
           For more details, please visit https://fdw.dev.
