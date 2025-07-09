@@ -117,10 +117,17 @@ impl Guest for GravatarFdw {
 
         // Look for email filters in quals
         let mut emails_to_fetch = Vec::new();
-        for qual in ctx.get_quals() {
-            if qual.field() == "email" && qual.operator() == "=" {
-                if let Value::Cell(Cell::String(email)) = qual.value() {
-                    emails_to_fetch.push(email);
+        let quals = ctx.get_quals();
+        
+        for qual in quals {
+            if qual.field() == "email" {
+                if qual.operator() == "=" {
+                    if let Value::Cell(Cell::String(email)) = qual.value() {
+                        emails_to_fetch.push(email);
+                    }
+                } else {
+                    // Handle unsupported operators like IN, LIKE, etc.
+                    return Err(format!("Unsupported operator '{}' for email field. Only '=' (equality) is supported.", qual.operator()));
                 }
             }
         }
@@ -129,6 +136,11 @@ impl Guest for GravatarFdw {
         if emails_to_fetch.is_empty() {
             utils::report_info("No email filters provided. Gravatar FDW requires email = 'email@example.com' in WHERE clause");
             return Ok(());
+        }
+
+        // Only allow one email at a time
+        if emails_to_fetch.len() > 1 {
+            return Err(format!("Multiple email filters are not supported. Found {} email conditions. Use separate queries for each email.", emails_to_fetch.len()));
         }
 
         // Fetch profiles for each email

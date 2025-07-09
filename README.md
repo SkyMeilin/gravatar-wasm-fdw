@@ -169,7 +169,9 @@ WHERE email = 'user@example.com';
 
 - Requires email filters in WHERE clause (cannot scan without email)
 - Only supports retrieving a single email per query
-- Only supports retrieving by email field (equality check)
+  - Use separate queries for each email address
+  - Multiple email conditions will return an error (when detected – see below)
+  - Using `OR` like `email = 'a@example.com' OR email = 'b@example.com'` is not supported and _most likely_ will return zero results. This is a limitation on Wrappers library in which our FDW implementation does not receive any WHERE clauses.
 - No automatic schema import (yet)
 - Read-only (no INSERT/UPDATE/DELETE operations)
 - Any request failure implies three retries with exponential backoff.
