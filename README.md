@@ -47,7 +47,7 @@ server gravatar_server
     fdw_package_url 'https://github.com/Automattic/gravatar-wasm-fdw/releases/download/v0.1.0/gravatar_fdw.wasm',
     fdw_package_name 'automattic:gravatar-fdw',
     fdw_package_version '0.1.0',
-    fdw_package_checksum 'b8e976373ad57cae3843186985d667529cf2308d872cbab15a7878ffbdb39b56',
+    fdw_package_checksum 'dddd85790810402baaf9c2b4ddc0172c204071307f836cce7d319789b62cf153',
     api_key_id 'your-vault-secret-uuid-here'
   );
 
